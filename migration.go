@@ -2,7 +2,6 @@ package sqltestutil
 
 import (
 	"context"
-	"io/ioutil"
 	"path/filepath"
 	"sort"
 
@@ -26,7 +25,7 @@ func RunMigrations(ctx context.Context, db sqlx.ExecerContext, migrationDir stri
 	}
 	sort.Strings(filenames)
 	for _, filename := range filenames {
-		data, err := ioutil.ReadFile(filename)
+		data, err := io.ReadFile(filename)
 		if err != nil {
 			return err
 		}
