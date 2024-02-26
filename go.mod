@@ -1,12 +1,11 @@
 module github.com/bitcomplete/sqltestutil
 
-go 1.18
+go 1.22
 
 require (
 	github.com/docker/docker v20.10.16+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/go-yaml/yaml v2.1.0+incompatible
-	github.com/jmoiron/sqlx v1.3.5
 	github.com/stretchr/testify v1.7.1
 )
 
