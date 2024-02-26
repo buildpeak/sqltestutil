@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/jackc/pgx/v5"
 )
 
 // PostgresContainer is a Docker container running Postgres. It can be used to
@@ -22,6 +23,7 @@ type PostgresContainer struct {
 	id       string
 	password string
 	port     string
+	connStr  string
 }
 
 // StartPostgresContainer starts a new Postgres Docker container. The version
@@ -49,19 +51,19 @@ type PostgresContainer struct {
 // container and then run sub-tests within there. The testify [2] suite
 // package provides a good way to structure these kinds of tests:
 //
-//     type ExampleTestSuite struct {
-//         suite.Suite
-//     }
+//	type ExampleTestSuite struct {
+//	    suite.Suite
+//	}
 //
-//     func (s *ExampleTestSuite) TestExample() {
-//         // test something
-//     }
+//	func (s *ExampleTestSuite) TestExample() {
+//	    // test something
+//	}
 //
-//     func TestExampleTestSuite(t *testing.T) {
-//         pg, _ := sqltestutil.StartPostgresContainer(context.Background(), "12")
-//         defer pg.Shutdown(ctx)
-//         suite.Run(t, &ExampleTestSuite{})
-//     }
+//	func TestExampleTestSuite(t *testing.T) {
+//	    pg, _ := sqltestutil.StartPostgresContainer(context.Background(), "12")
+//	    defer pg.Shutdown(ctx)
+//	    suite.Run(t, &ExampleTestSuite{})
+//	}
 //
 // [1]: https://github.com/golang/go/issues/37206
 // [2]: https://github.com/stretchr/testify
@@ -160,17 +162,30 @@ HealthCheck:
 			time.Sleep(500 * time.Millisecond)
 		}
 	}
+
+	connStr := fmt.Sprintf("postgres://pgtest:%s@127.0.0.1:%s/pgtest", password, port)
+	err = waitUntilConnectable(ctx, connStr, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
 	return &PostgresContainer{
 		id:       createResp.ID,
 		password: password,
 		port:     port,
+		connStr:  connStr,
 	}, nil
 }
 
 // ConnectionString returns a connection URL string that can be used to connect
 // to the running Postgres container.
 func (c *PostgresContainer) ConnectionString() string {
-	return fmt.Sprintf("postgres://pgtest:%s@127.0.0.1:%s/pgtest", c.password, c.port)
+	return c.connStr
+}
+
+// ID returns the Docker container ID of the running Postgres container.
+func (c *PostgresContainer) ID() string {
+	return c.id
 }
 
 // Shutdown cleans up the Postgres container by stopping and removing it. This
@@ -191,6 +206,29 @@ func (c *PostgresContainer) Shutdown(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func waitUntilConnectable(ctx context.Context, connStr string, timeout time.Duration) error {
+	db, err := pgx.Connect(ctx, connStr)
+	if err != nil {
+		return err
+	}
+	defer db.Close(ctx)
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		err := db.Ping(ctx)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 var passwordLetters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

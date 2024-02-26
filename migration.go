@@ -3,6 +3,7 @@ package sqltestutil
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -26,17 +27,17 @@ type ExecerContext interface {
 func RunMigrations(ctx context.Context, db ExecerContext, migrationDir string) error {
 	filenames, err := filepath.Glob(filepath.Join(migrationDir, "*.up.sql"))
 	if err != nil {
-		return err
+		return fmt.Errorf("glob migrationDir error: %w", err)
 	}
 	sort.Strings(filenames)
 	for _, filename := range filenames {
 		data, err := os.ReadFile(filename)
 		if err != nil {
-			return err
+			return fmt.Errorf("read file error: %w", err)
 		}
 		_, err = db.ExecContext(ctx, string(data))
 		if err != nil {
-			return err
+			return fmt.Errorf("exec file error: %w", err)
 		}
 	}
 	return nil

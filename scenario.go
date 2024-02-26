@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-yaml/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // LoadScenario reads a YAML "scenario" file and uses it to populate the given
@@ -49,6 +49,7 @@ func LoadScenario(ctx context.Context, db ExecerContext, filename string) error 
 			for column := range row {
 				columns = append(columns, column)
 				placeholders = append(placeholders, fmt.Sprintf("$%d", len(placeholders)+1))
+				values = append(values, row[column])
 			}
 			query := fmt.Sprintf(
 				"INSERT INTO %q (%s) VALUES (%s)",
