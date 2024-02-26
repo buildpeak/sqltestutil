@@ -3,6 +3,7 @@ package sqltestutil
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +15,12 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/jackc/pgx/v5"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
+
+const (
+	waitInterval = 100 * time.Millisecond
 )
 
 // PostgresContainer is a Docker container running Postgres. It can be used to
@@ -159,7 +165,7 @@ HealthCheck:
 		case "healthy":
 			break HealthCheck
 		default:
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(waitInterval)
 		}
 	}
 
@@ -209,11 +215,11 @@ func (c *PostgresContainer) Shutdown(ctx context.Context) error {
 }
 
 func waitUntilConnectable(ctx context.Context, connStr string, timeout time.Duration) error {
-	db, err := pgx.Connect(ctx, connStr)
+	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		return err
 	}
-	defer db.Close(ctx)
+	defer db.Close()
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -223,11 +229,12 @@ func waitUntilConnectable(ctx context.Context, connStr string, timeout time.Dura
 			return ctx.Err()
 		default:
 		}
-		err := db.Ping(ctx)
+
+		err := db.PingContext(ctx)
 		if err == nil {
 			return nil
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(waitInterval)
 	}
 }
 
