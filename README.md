@@ -4,6 +4,16 @@
 
 Utilities for testing Golang code that runs SQL.
 
+## Quick Start
+
+```golang
+# Postgres version is "12"
+pg, _ := sqltestutil.StartPostgresContainer(context.Background(), "12")
+defer pg.Shutdown(ctx)
+db, err := sql.Open("postgres", pg.ConnectionString())
+// ... execute SQL
+```
+
 ## Usage
 
 ### PostgresContainer
