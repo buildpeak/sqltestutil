@@ -21,6 +21,7 @@ import (
 
 const (
 	waitInterval = 100 * time.Millisecond
+	waitTimeout  = 10 * time.Second
 )
 
 // PostgresContainer is a Docker container running Postgres. It can be used to
@@ -170,7 +171,7 @@ HealthCheck:
 	}
 
 	connStr := fmt.Sprintf("postgres://pgtest:%s@127.0.0.1:%s/pgtest", password, port)
-	err = waitUntilConnectable(ctx, connStr, 10*time.Second)
+	err = waitUntilConnectable(ctx, connStr, waitTimeout)
 	if err != nil {
 		return nil, err
 	}
