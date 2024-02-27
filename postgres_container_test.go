@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -90,4 +91,15 @@ func ExampleRunMigrationsAndScenario() {
 
 	fmt.Printf("%s %s\n", username, password)
 	// Output: user1 password1
+}
+
+func BenchmarkStartPostgresContainer(b *testing.B) {
+	ctx := context.Background()
+	for i := 0; i < b.N; i++ {
+		container, err := StartPostgresContainer(ctx, "15")
+		if err != nil {
+			b.Fatalf("could not start container: %v", err)
+		}
+		container.Shutdown(ctx)
+	}
 }
