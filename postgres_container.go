@@ -114,6 +114,7 @@ func StartPostgresContainer(ctx context.Context, version string) (*PostgresConta
 			"POSTGRES_DB=pgtest",
 			"POSTGRES_PASSWORD=" + password,
 			"POSTGRES_USER=pgtest",
+			"TZ=UTC",
 		},
 		Healthcheck: &container.HealthConfig{
 			Test:     []string{"CMD-SHELL", "pg_isready -U pgtest"},
