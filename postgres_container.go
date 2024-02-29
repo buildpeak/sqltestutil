@@ -153,8 +153,19 @@ func StartPostgresContainer(ctx context.Context, version string) (*PostgresConta
 			}
 		}
 	}()
+
+	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
+	defer cancel()
+
 HealthCheck:
 	for {
+		// Check if the context has been cancelled before each health check
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		inspect, err := cli.ContainerInspect(ctx, createResp.ID)
 		if err != nil {
 			return nil, err
@@ -171,7 +182,7 @@ HealthCheck:
 	}
 
 	connStr := fmt.Sprintf("postgres://pgtest:%s@127.0.0.1:%s/pgtest", password, port)
-	err = waitUntilConnectable(ctx, connStr, waitTimeout)
+	err = waitUntilConnectable(ctx, connStr)
 	if err != nil {
 		return nil, err
 	}
@@ -215,15 +226,13 @@ func (c *PostgresContainer) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func waitUntilConnectable(ctx context.Context, connStr string, timeout time.Duration) error {
+func waitUntilConnectable(ctx context.Context, connStr string) error {
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 	for {
 		select {
 		case <-ctx.Done():
