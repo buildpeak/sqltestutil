@@ -260,7 +260,6 @@ HealthCheck:
 		port,
 		config.DBName,
 		config.SSLMode,
-		config.TimeZone,
 	)
 	err = waitUntilConnectable(ctx, connStr)
 	if err != nil {
