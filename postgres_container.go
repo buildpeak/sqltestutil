@@ -254,7 +254,7 @@ HealthCheck:
 	}
 
 	connStr := fmt.Sprintf(
-		"postgres://%s:%s@127.0.0.1:%s/%s?sslmode=%s&timezone=%s",
+		"postgres://%s:%s@127.0.0.1:%s/%s?sslmode=%s",
 		config.DBUser,
 		password,
 		port,
