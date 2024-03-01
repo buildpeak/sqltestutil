@@ -24,6 +24,59 @@ const (
 	waitTimeout  = 10 * time.Second
 )
 
+// PostgresContainerConfig is a configuration struct for PostgresContainer.
+// It's used to pass configuration options to the StartPostgresContainer
+type PostgresContainerConfig struct {
+	// DBName is to set POSTGRES_DB environment variable
+	DBName string
+	// DBUser is to set POSTGRES_USER environment variable
+	DBUser string
+	// DBPassword is to set POSTGRES_PASSWORD environment variable
+	DBPassword string
+	// TimeZone is to set TZ environment variable. It's also used to set timezone query parameter in the connection string
+	TimeZone string
+	// SSLMode is to set sslmode query parameter in the connection string
+	SSLMode string
+}
+
+// PostgresContainerConfig setter
+type Option func(*PostgresContainerConfig)
+
+// WithDBName sets the DBName field of the PostgresContainerConfig
+func WithDBName(dbName string) Option {
+	return func(c *PostgresContainerConfig) {
+		c.DBName = dbName
+	}
+}
+
+// WithDBUser sets the DBUser field of the PostgresContainerConfig
+func WithDBUser(dbUser string) Option {
+	return func(c *PostgresContainerConfig) {
+		c.DBUser = dbUser
+	}
+}
+
+// WithDBPassword sets the DBPassword field of the PostgresContainerConfig
+func WithDBPassword(dbPassword string) Option {
+	return func(c *PostgresContainerConfig) {
+		c.DBPassword = dbPassword
+	}
+}
+
+// WithTimeZone sets the TimeZone field of the PostgresContainerConfig
+func WithTimeZone(timeZone string) Option {
+	return func(c *PostgresContainerConfig) {
+		c.TimeZone = timeZone
+	}
+}
+
+// WithSSLMode sets the SSLMode field of the PostgresContainerConfig
+func WithSSLMode(sslMode string) Option {
+	return func(c *PostgresContainerConfig) {
+		c.SSLMode = sslMode
+	}
+}
+
 // PostgresContainer is a Docker container running Postgres. It can be used to
 // cheaply start a throwaway Postgres instance for testing.
 type PostgresContainer struct {
@@ -74,12 +127,17 @@ type PostgresContainer struct {
 //
 // [1]: https://github.com/golang/go/issues/37206
 // [2]: https://github.com/stretchr/testify
-func StartPostgresContainer(ctx context.Context, version string) (*PostgresContainer, error) {
+func StartPostgresContainer(
+	ctx context.Context,
+	version string,
+	options ...Option,
+) (*PostgresContainer, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		panic(err)
 	}
 	defer cli.Close()
+
 	image := "postgres:" + version
 	_, _, err = cli.ImageInspectWithRaw(ctx, image)
 	if err != nil {
@@ -104,6 +162,19 @@ func StartPostgresContainer(ctx context.Context, version string) (*PostgresConta
 	if err != nil {
 		return nil, err
 	}
+
+	config := &PostgresContainerConfig{
+		DBName:     "pgtest",
+		DBUser:     "pgtest",
+		DBPassword: password,
+		TimeZone:   "UTC",
+		SSLMode:    "disable",
+	}
+
+	for _, option := range options {
+		option(config)
+	}
+
 	port, err := randomPort()
 	if err != nil {
 		return nil, err
@@ -111,10 +182,10 @@ func StartPostgresContainer(ctx context.Context, version string) (*PostgresConta
 	createResp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image: image,
 		Env: []string{
-			"POSTGRES_DB=pgtest",
-			"POSTGRES_PASSWORD=" + password,
-			"POSTGRES_USER=pgtest",
-			"TZ=UTC",
+			"POSTGRES_DB=" + config.DBName,
+			"POSTGRES_PASSWORD=" + config.DBPassword,
+			"POSTGRES_USER=" + config.DBUser,
+			"TZ=" + config.TimeZone,
 		},
 		Healthcheck: &container.HealthConfig{
 			Test:     []string{"CMD-SHELL", "pg_isready -U pgtest"},
@@ -182,7 +253,15 @@ HealthCheck:
 		}
 	}
 
-	connStr := fmt.Sprintf("postgres://pgtest:%s@127.0.0.1:%s/pgtest", password, port)
+	connStr := fmt.Sprintf(
+		"postgres://%s:%s@127.0.0.1:%s/%s?sslmode=%s&timezone=%s",
+		config.DBUser,
+		password,
+		port,
+		config.DBName,
+		config.SSLMode,
+		config.TimeZone,
+	)
 	err = waitUntilConnectable(ctx, connStr)
 	if err != nil {
 		return nil, err

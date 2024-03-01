@@ -6,9 +6,40 @@ import (
 	"fmt"
 	"log"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+func TestStartPostgresContainer(t *testing.T) {
+	ctx := context.Background()
+
+	container, err := StartPostgresContainer(ctx, "15")
+	if err != nil {
+		t.Fatalf("could not start container: %v", err)
+	}
+	defer container.Shutdown(ctx)
+
+	db, err := sql.Open("pgx", container.ConnectionString())
+	if err != nil {
+		container.Shutdown(ctx)
+		t.Fatalf("could not open connection: %v", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		container.Shutdown(ctx)
+		t.Fatalf("could not ping database: %v", err)
+	}
+
+	row := db.QueryRowContext(ctx, "SELECT NOW()")
+	var result time.Time
+	if err := row.Scan(&result); err != nil {
+		container.Shutdown(ctx)
+		t.Fatalf("could not scan row: %v", err)
+	}
+
+	t.Logf("result: %s", result)
+}
 
 func ExamplePostgresContainer() {
 	ctx := context.Background()
