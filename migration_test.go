@@ -9,8 +9,9 @@ import (
 )
 
 func TestRunMigrations(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
-		ctx          context.Context
 		db           ExecerContext
 		migrationDir string
 	}
@@ -22,7 +23,6 @@ func TestRunMigrations(t *testing.T) {
 		{
 			name: "good",
 			args: args{
-				ctx:          context.Background(),
 				db:           &mockExecerContext{debug: true},
 				migrationDir: "testdata",
 			},
@@ -30,8 +30,12 @@ func TestRunMigrations(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
-			err := RunMigrations(tt.args.ctx, tt.args.db, tt.args.migrationDir)
+			t.Parallel()
+
+			err := RunMigrations(context.Background(), tt.args.db, tt.args.migrationDir)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RunMigrations() error = %v, wantErr %v", err, tt.wantErr)
 			}

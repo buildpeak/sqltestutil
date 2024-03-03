@@ -6,8 +6,9 @@ import (
 )
 
 func TestLoadScenario(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
-		ctx      context.Context
 		db       ExecerContext
 		filename string
 	}
@@ -19,16 +20,23 @@ func TestLoadScenario(t *testing.T) {
 		{
 			name: "good",
 			args: args{
-				ctx:      context.Background(),
 				db:       &mockExecerContext{debug: true},
 				filename: "testdata/scenario.yml",
 			},
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
-			if err := LoadScenario(tt.args.ctx, tt.args.db, tt.args.filename); (err != nil) != tt.wantErr {
-				t.Errorf("LoadScenario() error = %v, wantErr %v", err, tt.wantErr)
+			t.Parallel()
+
+			if err := LoadScenario(context.Background(), tt.args.db, tt.args.filename); (err != nil) != tt.wantErr {
+				t.Errorf(
+					"LoadScenario() error = %v, wantErr %v",
+					err,
+					tt.wantErr,
+				)
 			}
 		})
 	}

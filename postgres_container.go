@@ -179,7 +179,8 @@ func StartPostgresContainer(
 	if err != nil {
 		return nil, err
 	}
-	createResp, err := cli.ContainerCreate(ctx, &container.Config{
+
+	createResp, errCnr := cli.ContainerCreate(ctx, &container.Config{
 		Image: image,
 		Env: []string{
 			"POSTGRES_DB=" + config.DBName,
@@ -200,11 +201,13 @@ func StartPostgresContainer(
 			},
 		},
 	}, nil, nil, "")
-	if err != nil {
-		return nil, err
+	if errCnr != nil {
+		return nil, errCnr
 	}
+
 	defer func() {
-		if err != nil {
+		// remove the container if there's an error
+		if errCnr != nil {
 			removeErr := cli.ContainerRemove(ctx, createResp.ID, types.ContainerRemoveOptions{})
 			if removeErr != nil {
 				fmt.Println("error removing container:", removeErr)
@@ -212,12 +215,14 @@ func StartPostgresContainer(
 			}
 		}
 	}()
-	err = cli.ContainerStart(ctx, createResp.ID, types.ContainerStartOptions{})
-	if err != nil {
-		return nil, err
+
+	errCnr = cli.ContainerStart(ctx, createResp.ID, types.ContainerStartOptions{})
+	if errCnr != nil {
+		return nil, errCnr
 	}
 	defer func() {
-		if err != nil {
+		// stop the container if there's an error
+		if errCnr != nil {
 			stopErr := cli.ContainerStop(ctx, createResp.ID, nil)
 			if stopErr != nil {
 				fmt.Println("error stopping container:", stopErr)
@@ -229,28 +234,10 @@ func StartPostgresContainer(
 	ctx, cancel := context.WithTimeout(ctx, waitTimeout)
 	defer cancel()
 
-HealthCheck:
-	for {
-		// Check if the context has been cancelled before each health check
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		inspect, err := cli.ContainerInspect(ctx, createResp.ID)
-		if err != nil {
-			return nil, err
-		}
-		status := inspect.State.Health.Status
-		switch status {
-		case "unhealthy":
-			return nil, errors.New("container unhealthy")
-		case "healthy":
-			break HealthCheck
-		default:
-			time.Sleep(waitInterval)
-		}
+	// wait until the container is healthy
+	errCnr = waitUntilHealthy(ctx, cli, createResp.ID)
+	if errCnr != nil {
+		return nil, errCnr
 	}
 
 	connStr := fmt.Sprintf(
@@ -261,9 +248,11 @@ HealthCheck:
 		config.DBName,
 		config.SSLMode,
 	)
-	err = waitUntilConnectable(ctx, connStr)
-	if err != nil {
-		return nil, err
+
+	// wait until the container is connectable
+	errCnr = waitUntilConnectable(ctx, connStr)
+	if errCnr != nil {
+		return nil, errCnr
 	}
 
 	return &PostgresContainer{
@@ -303,6 +292,31 @@ func (c *PostgresContainer) Shutdown(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func waitUntilHealthy(ctx context.Context, cli *client.Client, containerID string) error {
+	for {
+		// Check if the context has been cancelled before each health check
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		inspect, err := cli.ContainerInspect(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("error inspecting container: %w", err)
+		}
+		status := inspect.State.Health.Status
+		switch status {
+		case "unhealthy":
+			return errors.New("container unhealthy")
+		case "healthy":
+			return nil
+		default:
+			time.Sleep(waitInterval)
+		}
+	}
 }
 
 func waitUntilConnectable(ctx context.Context, connStr string) error {
