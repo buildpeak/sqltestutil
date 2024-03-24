@@ -189,7 +189,7 @@ func StartPostgresContainer(
 			"TZ=" + config.TimeZone,
 		},
 		Healthcheck: &container.HealthConfig{
-			Test:     []string{"CMD-SHELL", "pg_isready -U pgtest"},
+			Test:     []string{"CMD-SHELL", "pg_isready -U " + config.DBUser},
 			Interval: time.Second,
 			Timeout:  time.Second,
 			Retries:  10,
